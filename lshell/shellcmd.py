@@ -64,6 +64,9 @@ class ShellCmd(cmd.Cmd, object):
         # set prompt
         self.conf['promptprint'] = utils.updateprompt(os.getcwd(), self.conf)
 
+        # set PS2 prompt
+        self.prompt2 = '> '
+
         self.intro = self.conf['intro']
 
         # initialize oldpwd variable to home directory
@@ -236,6 +239,12 @@ class ShellCmd(cmd.Cmd, object):
                 self.stdout.write("%s\n" % self.intro)
             if self.conf['login_script']:
                 utils.exec_cmd(self.conf['login_script'])
+
+            # for long commands, a user may escape the new line
+            # by giving a bash like '\' character at the end of
+            # the line. cmdloop() needs to recognize that and
+            # create an appended line before sending it to onecmd()
+            partial_line = None
             stop = None
             while not stop:
                 if self.cmdqueue:
@@ -262,6 +271,24 @@ class ShellCmd(cmd.Cmd, object):
                         else:
                             # chop \n
                             line = line[:-1]
+                if len(line) > 1 and line.startswith('\\'):
+                    # implying previous partial line
+                    line = line[:1].replace('\\', '', 1)
+                if partial_line:
+                    line = partial_line + line
+                if line.endswith('\\'):
+                    # continuation character. First partial line.
+                    # We shall expect the command to continue in
+                    # a new line. Change to bash like PS2 prompt to
+                    # indicate this continuation to the user
+                    partial_line = line.strip('\\')
+                    # switching to PS2
+                    self.conf['promptprint'] = self.prompt2
+                    continue
+                # reset prompt to PS1
+                self.conf['promptprint'] = utils.updateprompt(os.getcwd(),
+                                                              self.conf)
+                partial_line = None
                 line = self.precmd(line)
                 stop = self.onecmd(line)
                 stop = self.postcmd(stop, line)
