@@ -72,6 +72,7 @@ class ShellCmd(cmd.Cmd, object):
         # initialize cli variables
         self.g_cmd = g_cmd
         self.g_line = g_line
+        self.g_arg = None
 
         # initialize return code
         self.retcode = 0
@@ -142,7 +143,7 @@ class ShellCmd(cmd.Cmd, object):
             # replace previous command exit code
             # in case multiple commands (using separators), only replace first
             # command. Regex replaces all occurrences of $?, before ;,&,|
-            if re.search('[;&\|]', self.g_line):
+            if re.search('[;&|]', self.g_line):
                 p = re.compile("(\s|^)(\$\?)([\s|$]?[;&|].*)")
             else:
                 p = re.compile("(\s|^)(\$\?)(\s|$)")
@@ -290,7 +291,7 @@ class ShellCmd(cmd.Cmd, object):
             origline = readline.get_line_buffer()
             line = origline.lstrip()
             # in case '|', ';', '&' used, take last part of line to complete
-            line = re.split('&|\||;', line)[-1].lstrip()
+            line = re.split('[&|;]', line)[-1].lstrip()
             stripped = len(origline) - len(line)
             begidx = readline.get_begidx() - stripped
             endidx = readline.get_endidx() - stripped
@@ -302,12 +303,12 @@ class ShellCmd(cmd.Cmd, object):
                     and line.split(' ')[0] in self.conf['allowed']:
                 compfunc = self.completechdir
             elif begidx > 0:
-                cmd, args, foo = self.parseline(line)
-                if cmd == '':
+                command, args, foo = self.parseline(line)
+                if command == '':
                     compfunc = self.completedefault
                 else:
                     try:
-                        compfunc = getattr(self, 'complete_' + cmd)
+                        compfunc = getattr(self, 'complete_' + command)
                     except AttributeError:
                         compfunc = self.completedefault
                     # exception called when using './' completion
@@ -343,10 +344,10 @@ class ShellCmd(cmd.Cmd, object):
         commands = self.conf['allowed']
         commands.append('help')
         if line.startswith('./'):
-            return [cmd[2:] for cmd in commands if cmd.startswith('./%s'
-                                                                  % text)]
+            return [comd[2:] for comd in commands if comd.startswith('./%s'
+                                                                     % text)]
         else:
-            return [cmd for cmd in commands if cmd.startswith(text)]
+            return [comd for comd in commands if comd.startswith(text)]
 
     def completesudo(self, text, line, begidx, endidx):
         """ complete sudo command """
@@ -396,18 +397,18 @@ class ShellCmd(cmd.Cmd, object):
         self.g_arg and self.g_line.
         Those variables are then used by the __getattr__ method
         """
-        cmd, arg, line = self.parseline(line)
-        self.g_cmd, self.g_arg, self.g_line = [cmd, arg, line]
+        command, arg, line = self.parseline(line)
+        self.g_cmd, self.g_arg, self.g_line = [command, arg, line]
         if not line:
             return self.emptyline()
-        if cmd is None:
+        if command is None:
             return self.default(line)
         self.lastcmd = line
-        if cmd == '':
+        if command == '':
             return self.default(line)
         else:
             try:
-                func = getattr(self, 'do_' + cmd)
+                func = getattr(self, 'do_' + command)
             except AttributeError:
                 return self.default(line)
             return func(arg)
