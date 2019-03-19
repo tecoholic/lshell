@@ -1,5 +1,5 @@
-lshell - limited shell  [![Build Status](https://travis-ci.org/ghantoos/lshell.svg?branch=master)](https://travis-ci.org/ghantoos/lshell)
-======================
+lshell - limited shell  [![Build Status](https://travis-ci.org/tecoholic/lshell.svg?branch=master)](https://travis-ci.org/tecoholic/lshell)
+===========================================================================================================================================
 
 lshell is a shell coded in Python, that lets you restrict a user's environment to limited sets of commands, choose to enable/disable any command over SSH (e.g. SCP, SFTP, rsync, etc.), log user's commands, implement timing restriction, and more. 
 
