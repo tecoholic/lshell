@@ -3,3 +3,9 @@
 .coverage
 .tox/
 lshell.egg-info/
+
+# IDE files
+.idea/
+
+# Virtual Environment
+venv/
