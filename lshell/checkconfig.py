@@ -60,11 +60,24 @@ class CheckConfig:
         else:
             self.stderr = stderr
 
+        # define log levels dict
+        self.levels = {
+            1: logging.CRITICAL,
+            2: logging.ERROR,
+            3: logging.WARNING,
+            4: logging.DEBUG
+        }
+
         self.refresh = refresh
         self.conf = {}
         self.conf, self.arguments = self.getoptions(args, self.conf)
         configfile = self.conf['configfile']
         self.conf['config_mtime'] = self.get_config_mtime(configfile)
+        self.logfile = None
+        self.config = None
+        self.log = None
+        self.user = None
+        self.conf_raw = None
         self.check_file(configfile)
         self.get_global()
         self.check_log()
@@ -91,6 +104,7 @@ class CheckConfig:
         except getopt.GetoptError:
             self.stderr.write('Missing or unknown argument(s)\n')
             utils.usage()
+            return
 
         for option, value in optlist:
             if option in ['--config']:
@@ -159,17 +173,11 @@ class CheckConfig:
     def check_log(self):
         """ Sets the log level and log file
         """
-        # define log levels dict
-        self.levels = {1: logging.CRITICAL,
-                       2: logging.ERROR,
-                       3: logging.WARNING,
-                       4: logging.DEBUG}
-
         # create logger for lshell application
         if 'syslogname' in self.conf:
             try:
                 logname = eval(self.conf['syslogname'])
-            except:
+            except Exception:
                 logname = self.conf['syslogname']
         else:
             logname = 'lshell'
@@ -179,7 +187,7 @@ class CheckConfig:
 
         # close any logger handler/filters if exists
         # this is useful if configuration is reloaded
-        for loghandler in logger.handlers:
+        for _ in logger.handlers:
             try:
                 logging.shutdown(logger.handlers)
             except TypeError:
@@ -218,7 +226,7 @@ class CheckConfig:
         if 'logfilename' in self.conf:
             try:
                 logfilename = eval(self.conf['logfilename'])
-            except:
+            except Exception:
                 logfilename = self.conf['logfilename']
             currentime = time.localtime()
             logfilename = logfilename.replace('%y', '%s' % currentime[0])
@@ -336,8 +344,8 @@ class CheckConfig:
                         elif stuff and key == 'path':
                             liste = ['', '']
                             for path in eval(stuff):
-                                for item in glob.glob(path):
-                                    liste[0] += os.path.realpath(item) + '/.*|'
+                                for it in glob.glob(path):
+                                    liste[0] += os.path.realpath(it) + '/.*|'
                             # remove double slashes
                             liste[0] = liste[0].replace("//", "/")
                             self.conf_raw.update({key: str(liste)})
@@ -349,8 +357,8 @@ class CheckConfig:
                 elif key == 'path':
                     liste = ['', '']
                     for path in self.myeval(value, 'path'):
-                        for item in glob.glob(path):
-                            liste[0] += os.path.realpath(item) + '/.*|'
+                        for fileitem in glob.glob(path):
+                            liste[0] += os.path.realpath(fileitem) + '/.*|'
                     # remove double slashes
                     liste[0] = liste[0].replace("//", "/")
                     self.conf_raw.update({key: str(liste)})
@@ -565,7 +573,7 @@ class CheckConfig:
                 self.conf['history_file'] = eval(
                     self.conf_raw['history_file'].replace(
                         "%u", self.conf['username']))
-            except:
+            except Exception:
                 self.log.error('CONF: history file error: %s'
                                % self.conf['history_file'])
         else:
@@ -578,8 +586,7 @@ class CheckConfig:
         os.environ['PATH'] = os.environ['PATH'] + self.conf['env_path']
 
         # append default commands to allowed list
-        self.conf['allowed'] += list(set(variables.builtins_list) -
-                                     set(['export']))
+        self.conf['allowed'] += list(set(variables.builtins_list) - {'export'})
 
         # in case sudo_commands is not empty, append sudo to allowed commands
         if self.conf['sudo_commands']:
@@ -801,7 +808,8 @@ class CheckConfig:
 
         self.conf['allowed'] += self.conf['allowed_shell_escape']
 
-    def get_config_mtime(self, configfile):
+    @staticmethod
+    def get_config_mtime(configfile):
         """ get configuration file modification time, and store in the
             configuration dict. This should then be used to reload the
             configuration dynamically upon file changes
